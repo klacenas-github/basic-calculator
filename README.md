@@ -1,4 +1,4 @@
-# Basic Calculator v1.2.0
+# Basic Calculator v1.3.0
 
 A professional graphical calculator for Linux written in C using GTK+ 3.0. Features advanced expression-based mathematics with comprehensive error handling, dynamic precision, and robust UI.
 
@@ -193,6 +193,12 @@ Delete the config file to restore defaults.
 5. **History**: All calculations remain visible
 
 ## 📝 Changelog
+
+### Version 1.3.0 (January 20, 2026)
+- **Increased menu font size**: Better readability for View menu options
+- **Wayland compatibility**: Removed X11-specific window decorations for better compositor support
+- **Modern GTK implementation**: Replaced deprecated functions with CSS styling
+- **Developer improvements**: SSH authentication setup and Git credential configuration
 
 ### Version 1.2.0 (January 16, 2026)
 - **Dynamic precision display**: Smart decimal places for small numbers based on significant digits

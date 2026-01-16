@@ -1,9 +1,9 @@
-Basic Calculator Version 1.2.0
+Basic Calculator Version 1.3.0
 ===========================================
 
-Release Date: January 16, 2026
+Release Date: January 20, 2026
 
-This is version 1.2.0 with comprehensive calculator features and robust implementation.
+This is version 1.3.0 with enhanced UI and modern GTK implementation.
 
 FEATURES:
 ---------
@@ -36,6 +36,12 @@ The calculator supports both mouse and keyboard input for all operations.
 
 CHANGELOG:
 ----------
+v1.3.0 - UI Improvements Release
+- Increased menu font size for better readability
+- Improved Wayland compatibility by removing X11-specific window decoration code
+- Replaced deprecated GTK functions with modern CSS styling
+- Enhanced SSH authentication setup for developers
+
 v1.2.0 - Advanced Calculator Release
 - Dynamic precision for small numbers with significant digit display
 - Comprehensive error handling and validation

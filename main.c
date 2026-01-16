@@ -1374,6 +1374,13 @@ int main(int argc, char *argv[]) {
     // Show all widgets
     gtk_widget_show_all(window);
 
+    // Remove minimize and maximize buttons, keep only close button
+    GdkWindow *gdk_window = gtk_widget_get_window(window);
+    if (gdk_window) {
+        GdkWMDecoration decorations = GDK_DECOR_BORDER | GDK_DECOR_TITLE | GDK_DECOR_MENU;
+        gdk_window_set_decorations(gdk_window, decorations);
+    }
+
     // Start GTK main loop
     gtk_main();
 

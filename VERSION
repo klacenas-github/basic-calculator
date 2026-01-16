@@ -1,0 +1,43 @@
+Basic Calculator Version 1.0.0
+===============================
+
+Release Date: January 16, 2026
+
+This is the first stable release of the Basic Calculator application.
+
+FEATURES:
+---------
+✓ Expression-based mathematical calculations
+✓ Full parentheses support with proper operator precedence
+✓ Persistent calculation history with scrollable display
+✓ Independent display and button scaling
+✓ Window size memory across sessions
+✓ Complete keyboard support for all operations
+✓ Professional UI with compact button design
+✓ Settings persistence for precision and display preferences
+✓ Support for complex mathematical expressions
+✓ Error handling and validation
+
+TECHNICAL SPECIFICATIONS:
+-------------------------
+- Language: C with GTK+ 3.0
+- Build system: GNU Make
+- Dependencies: GTK+ 3.0, GLib, Cairo, Pango
+- Platform: Linux (tested on CachyOS)
+- Architecture: x86_64
+
+USAGE:
+------
+Compile: make
+Run: ./calculator
+Clean: make clean
+
+The calculator supports both mouse and keyboard input for all operations.
+
+CHANGELOG:
+----------
+v1.0.0 - Initial release
+- Complete calculator implementation with advanced features
+- Expression parsing with parentheses and operator precedence
+- Persistent history and professional UI
+- Full keyboard and mouse support

@@ -5,6 +5,9 @@
 #include <pango/pango.h>
 #include <glib/gkeyfile.h>
 
+// CSS provider for styling
+GtkCssProvider *css_provider;
+
 // Global variables for calculator state
 GtkWidget *display;
 GtkTextBuffer *text_buffer;
@@ -170,12 +173,7 @@ void update_ui_scaling(GtkWidget *window) {
     int menu_font_size = MAX(8, button_font_size * 4 / 5);
     menu_font_size = MIN(menu_font_size, 18);
 
-    // Update display font
-    PangoFontDescription *display_font = pango_font_description_new();
-    pango_font_description_set_weight(display_font, PANGO_WEIGHT_BOLD);
-    pango_font_description_set_size(display_font, display_font_size * PANGO_SCALE);
-    gtk_widget_override_font(display, display_font);
-    pango_font_description_free(display_font);
+    // Update display font via CSS
 
     // Update display height for 5-line history
     GtkWidget *scrolled_window = gtk_widget_get_parent(display);
@@ -226,14 +224,7 @@ void update_ui_scaling(GtkWidget *window) {
         if (GTK_IS_CONTAINER(vbox)) {
             GList *vbox_children = gtk_container_get_children(GTK_CONTAINER(vbox));
             if (vbox_children) {
-                // Update menu bar font
-                GtkWidget *menu_bar = vbox_children->data;
-                if (GTK_IS_MENU_BAR(menu_bar)) {
-                    PangoFontDescription *menu_font = pango_font_description_new();
-                    pango_font_description_set_size(menu_font, menu_font_size * PANGO_SCALE);
-                    gtk_widget_override_font(menu_bar, menu_font);
-                    pango_font_description_free(menu_font);
-                }
+                // Update menu bar font via CSS
 
                 // Update grid (buttons)
                 if (vbox_children->next) {
@@ -245,20 +236,16 @@ void update_ui_scaling(GtkWidget *window) {
                         gtk_grid_set_column_spacing(GTK_GRID(grid), spacing);
 
                         // Update all buttons in the grid
-                        PangoFontDescription *button_font = pango_font_description_new();
-                        pango_font_description_set_size(button_font, button_font_size * PANGO_SCALE);
-
                         GList *grid_children = gtk_container_get_children(GTK_CONTAINER(grid));
                         for (GList *iter = grid_children; iter; iter = iter->next) {
                             GtkWidget *child = GTK_WIDGET(iter->data);
                             if (GTK_IS_BUTTON(child)) {
-                                gtk_widget_override_font(child, button_font);
+                                gtk_widget_set_name(child, "calc-button");
                                 gtk_widget_set_size_request(child, button_width, -1); // Width fixed, height flexible
                                 gtk_widget_set_vexpand(child, TRUE); // Expand vertically to fill space
                             }
                         }
                         g_list_free(grid_children);
-                        pango_font_description_free(button_font);
                     }
                 }
             }
@@ -266,6 +253,11 @@ void update_ui_scaling(GtkWidget *window) {
         }
         g_list_free(children);
     }
+
+    // Update CSS with new font sizes
+    char css[512];
+    snprintf(css, sizeof(css), "#display { font-weight: bold; font-size: %dpx; }\n#menu-bar { font-size: %dpx; }\n#calc-button { font-size: %dpx; }", display_font_size, menu_font_size, button_font_size);
+    gtk_css_provider_load_from_data(css_provider, css, -1, NULL);
 
     // Force redraw
     gtk_widget_queue_draw(window);
@@ -275,6 +267,7 @@ void update_ui_scaling(GtkWidget *window) {
 
 // Window resize/move handler
 gboolean on_window_resize(GtkWidget *widget, GdkEventConfigure *event, gpointer data) {
+    (void)widget; (void)event; (void)data;
     static int last_x = -1, last_y = -1, last_width = 0, last_height = 0;
     int threshold = 5; // Small threshold to avoid too many updates
 
@@ -337,26 +330,31 @@ void close_open_menus(GtkWidget *window) {
 
 // Handler to close menus when clicking on buttons
 gboolean on_window_button_press(GtkWidget *widget, GdkEventButton *event, gpointer data) {
-    // Only close menus if the click is not on a menu item
-    // Check if the event target is a menu - if so, don't close
-    GtkWidget *target = gtk_get_event_widget((GdkEvent *)event);
-    if (target && GTK_IS_MENU_ITEM(target)) {
-        return FALSE; // Let the menu item handle the click
+    // Only handle button press events (not release)
+    if (event->type != GDK_BUTTON_PRESS) {
+        return FALSE;
     }
-    
-    // Close menus only when clicking on non-menu areas (buttons, grid, etc.)
-    close_open_menus(widget);
+
+    // Only close menus if the click is not on menu-related widgets
+    // Check if the event target is a menu item, menu bar, or menu - if so, don't close
+    GtkWidget *target = gtk_get_event_widget((GdkEvent *)event);
+    if (target && (GTK_IS_MENU_ITEM(target) || GTK_IS_MENU_BAR(target) || GTK_IS_MENU(target))) {
+        return FALSE; // Let the menu system handle the click
+    }
+
     return FALSE; // Allow other handlers to process the event
 }
 
 // Handler to close menus when window loses focus
 gboolean on_window_focus_out(GtkWidget *widget, GdkEventFocus *event, gpointer data) {
+    (void)widget; (void)event; (void)data;
     close_open_menus(widget);
     return FALSE;
 }
 
 // Initialize UI scaling when window is first shown
 gboolean on_window_show(GtkWidget *widget, gpointer data) {
+    (void)widget; (void)data;
     update_ui_scaling(widget);
     clear_calculator();
     return FALSE;
@@ -398,12 +396,14 @@ void update_display_height_menu_labels() {
 
 // Idle callback to save settings without blocking menu operations
 gboolean save_settings_idle(gpointer data) {
+    (void)data;
     save_settings();
     return FALSE; // Don't repeat
 }
 
 // Menu callback functions for precision changes
 void on_precision_changed(GtkMenuItem *menuitem, gpointer user_data) {
+    (void)menuitem; (void)user_data;
     int new_precision = GPOINTER_TO_INT(user_data);
 
     // Only update if precision actually changed
@@ -442,6 +442,7 @@ void on_display_height_changed(GtkMenuItem *menuitem, gpointer user_data) {
 
 // Function to auto-scroll display to bottom
 gboolean scroll_display_to_bottom(gpointer data) {
+    (void)data;
     GtkTextIter end;
     gtk_text_buffer_get_end_iter(text_buffer, &end);
     gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(display), &end, 0.0, FALSE, 0.0, 0.0);
@@ -988,6 +989,7 @@ void on_equals_clicked(GtkWidget *widget, gpointer data) {
 
 // Function to handle clear button click
 void on_clear_clicked(GtkWidget *widget, gpointer data) {
+    (void)widget; (void)data;
     clear_calculator();
 }
 
@@ -1136,6 +1138,10 @@ int main(int argc, char *argv[]) {
     // Initialize GTK
     gtk_init(&argc, &argv);
 
+    // Create CSS provider for styling
+    css_provider = gtk_css_provider_new();
+    gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+
     // Load saved settings
     load_settings();
 
@@ -1144,8 +1150,8 @@ int main(int argc, char *argv[]) {
     gtk_window_set_title(GTK_WINDOW(window), "Basic Calculator");
     gtk_window_set_default_size(GTK_WINDOW(window), window_width, window_height);
 
-    // Remove minimize and maximize functionality by setting window type
-    gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_DIALOG);
+    // Set window type to normal for standard behavior
+    gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_NORMAL);
 
     // Center the window on screen
     gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER);
@@ -1166,11 +1172,10 @@ int main(int argc, char *argv[]) {
     g_signal_connect(window, "configure-event", G_CALLBACK(on_window_resize), NULL);
     g_signal_connect(window, "show", G_CALLBACK(on_window_show), NULL);
     g_signal_connect(window, "button-press-event", G_CALLBACK(on_window_button_press), NULL);
-    g_signal_connect(window, "button-release-event", G_CALLBACK(on_window_button_press), NULL);
-    g_signal_connect(window, "focus-out-event", G_CALLBACK(on_window_focus_out), NULL);
 
     // Create menu bar
     GtkWidget *menu_bar = gtk_menu_bar_new();
+    gtk_widget_set_name(menu_bar, "menu-bar");
 
     // View menu
     GtkWidget *view_menu = gtk_menu_new();
@@ -1382,14 +1387,7 @@ int main(int argc, char *argv[]) {
     // Show all widgets
     gtk_widget_show_all(window);
 
-    // Remove minimize and maximize buttons, keep only close button
-    GdkWindow *gdk_window = gtk_widget_get_window(window);
-    if (gdk_window) {
-        GdkWMDecoration decorations = GDK_DECOR_BORDER | GDK_DECOR_TITLE | GDK_DECOR_MENU;
-        gdk_window_set_decorations(gdk_window, decorations);
-    }
-
-    // Start GTK main loop
+    // Start GTK main loop87
     gtk_main();
 
     return 0;

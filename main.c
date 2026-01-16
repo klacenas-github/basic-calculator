@@ -170,8 +170,8 @@ void update_ui_scaling(GtkWidget *window) {
     button_font_size = MIN(button_font_size, 16);
 
     // Menu font: readable size
-    int menu_font_size = MAX(8, button_font_size * 4 / 5);
-    menu_font_size = MIN(menu_font_size, 18);
+    int menu_font_size = MAX(10, button_font_size * 4 / 5 + 2);
+    menu_font_size = MIN(menu_font_size, 20);
 
     // Update display font via CSS
 

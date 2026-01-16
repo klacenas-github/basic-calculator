@@ -206,3 +206,4 @@ Delete the config file to restore defaults.
 - Simple arithmetic operations
 - Basic scrolling display# basic-calculator
 # basic-calculator
+# basic-calculator

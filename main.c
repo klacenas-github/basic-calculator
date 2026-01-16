@@ -335,8 +335,16 @@ void close_open_menus(GtkWidget *window) {
     }
 }
 
-// Handler to close menus when clicking outside
+// Handler to close menus when clicking on buttons
 gboolean on_window_button_press(GtkWidget *widget, GdkEventButton *event, gpointer data) {
+    // Only close menus if the click is not on a menu item
+    // Check if the event target is a menu - if so, don't close
+    GtkWidget *target = gtk_get_event_widget((GdkEvent *)event);
+    if (target && GTK_IS_MENU_ITEM(target)) {
+        return FALSE; // Let the menu item handle the click
+    }
+    
+    // Close menus only when clicking on non-menu areas (buttons, grid, etc.)
     close_open_menus(widget);
     return FALSE; // Allow other handlers to process the event
 }

@@ -1,6 +1,6 @@
-# Basic Calculator v1.0
+# Basic Calculator v1.2.0
 
-A user-friendly graphical calculator for Linux written in C using GTK+ 3.0. Features expression-based mathematics with full parentheses support, persistent history, and clean UI.
+A professional graphical calculator for Linux written in C using GTK+ 3.0. Features advanced expression-based mathematics with comprehensive error handling, dynamic precision, and robust UI.
 
 ## 🚀 Key Features
 
@@ -8,26 +8,30 @@ A user-friendly graphical calculator for Linux written in C using GTK+ 3.0. Feat
 - **Expression-based calculations** - Build complex mathematical expressions before evaluating
 - **Full parentheses support** - Proper operator precedence with nested parentheses
 - **Advanced arithmetic** - Addition, subtraction, multiplication, division with correct precedence
-- **Decimal precision control** - Configurable decimal places (0-10) for results
-- **Error handling** - Division by zero protection and input validation
+- **Unary operators** - Support for negative numbers and unary plus
+- **Dynamic precision** - Smart decimal display for small numbers based on significant digits
+- **Comprehensive error handling** - Syntax validation, division by zero protection, stack overflow prevention
 
 ### User Interface
-- **Persistent calculation history** - All calculations remain visible with scrollable display
+- **Persistent calculation history** - All calculations remain visible with auto-scrollable display
 - **Independent scaling** - Display and buttons scale separately for optimal layout
-- **Window size memory** - Remembers your preferred window dimensions
-- **Compact design** - Optimized button heights and professional spacing
-- **Responsive layout** - Adapts perfectly from 70×30 pixels to fullscreen
-- **Right-margin protection** - Scroll bar doesn't block text content
+- **Window size memory** - Remembers your preferred window dimensions across sessions
+- **Compact professional design** - Optimized button heights and clean spacing
+- **Responsive layout** - Adapts perfectly from minimal to fullscreen sizes
+- **Right-margin protection** - Scroll bar doesn't interfere with text content
 
 ### Input Methods
 - **Complete keyboard support** - All operations work from keyboard including parentheses
-- **Mouse input** - Intuitive button interface
-- **Expression building** - Type complex formulas like `(2 + 3) * (4 - 1)`
+- **Mouse input** - Intuitive button interface with hover effects
+- **Advanced expression building** - Type complex formulas like `(2 + 3) * (-4 + 1)`
+- **Operator validation** - Prevents invalid operator sequences in real-time
 
 ### Advanced Features
-- **Operator precedence** - `*` and `/` before `+` and `-`, parentheses override all
-- **Continuing calculations** - Use previous results in new expressions
+- **Intelligent operator precedence** - `*` and `/` before `+` and `-`, parentheses override all
+- **Continuing calculations** - Use previous results in new expressions seamlessly
+- **Fresh calculation mode** - Press Enter after results to start completely fresh
 - **Settings persistence** - All preferences auto-saved and restored
+- **Memory safety** - Comprehensive bounds checking and leak prevention
 - **Professional appearance** - Clean, modern interface with proper typography
 
 ## 📋 Requirements
@@ -190,6 +194,23 @@ Delete the config file to restore defaults.
 
 ## 📝 Changelog
 
+### Version 1.2.0 (January 16, 2026)
+- **Dynamic precision display**: Smart decimal places for small numbers based on significant digits
+- **Comprehensive error handling**: Syntax validation, stack overflow protection, memory leak prevention
+- **Advanced operator validation**: Real-time prevention of invalid operator sequences
+- **Unary operator support**: Proper handling of negative numbers and unary plus
+- **Fresh calculation mode**: Press Enter after results to start completely fresh
+- **Enhanced parentheses handling**: Parentheses work after all operators
+- **Memory safety improvements**: Bounds checking, proper cleanup, leak prevention
+- **Professional error messages**: Clear "syntax error" feedback for malformed expressions
+- **Robust expression parsing**: Handles edge cases and malformed input gracefully
+
+### Version 1.1.0 (January 16, 2026)
+- **Operator validation**: Prevents consecutive operators and invalid sequences
+- **Enhanced keyboard support**: Improved key handling and input validation
+- **UI improvements**: Better button spacing and responsive scaling
+- **History management**: Enhanced display buffer handling
+
 ### Version 1.0.0 (January 16, 2026)
 - **Expression-based mathematics**: Build complete formulas before calculating
 - **Full parentheses support**: Proper operator precedence with nesting
@@ -204,6 +225,4 @@ Delete the config file to restore defaults.
 ### Version 0.x (Previous)
 - Basic immediate calculation
 - Simple arithmetic operations
-- Basic scrolling display# basic-calculator
-# basic-calculator
-# basic-calculator
+- Basic scrolling display

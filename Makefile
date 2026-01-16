@@ -2,7 +2,7 @@
 
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 `pkg-config --cflags gtk+-3.0`
-LIBS = `pkg-config --libs gtk+-3.0`
+LIBS = `pkg-config --libs gtk+-3.0` -lm
 TARGET = calculator
 SRC = main.c
 

@@ -10,6 +10,7 @@ GtkWidget *display;
 GtkTextBuffer *text_buffer;
 char current_input[256] = "";
 char expression[1024] = ""; // Full expression being built
+char history_buffer[4096] = ""; // Accumulated calculation history
 double result = 0;
 gboolean has_result = FALSE;
 
@@ -38,6 +39,26 @@ void update_ui_scaling(GtkWidget *window);
 void close_open_menus(GtkWidget *window);
 void clear_calculator(void);
 gboolean save_settings_idle(gpointer data);
+
+// Safe string operations with bounds checking
+int safe_strcat(char *dest, const char *src, size_t dest_size) {
+    size_t dest_len = strlen(dest);
+    size_t src_len = strlen(src);
+    if (dest_len + src_len >= dest_size) {
+        return 0; // Would overflow
+    }
+    strcat(dest, src);
+    return 1;
+}
+
+int safe_strcpy(char *dest, const char *src, size_t dest_size) {
+    size_t src_len = strlen(src);
+    if (src_len >= dest_size) {
+        return 0; // Would overflow
+    }
+    strcpy(dest, src);
+    return 1;
+}
 
 // Function to save settings
 void save_settings() {
@@ -145,9 +166,9 @@ void update_ui_scaling(GtkWidget *window) {
     int button_font_size = MAX(6, display_font_size * 2 / 3);
     button_font_size = MIN(button_font_size, 16);
 
-    // Menu font: smallest
-    int menu_font_size = MAX(4, button_font_size * 3 / 4);
-    menu_font_size = MIN(menu_font_size, 14);
+    // Menu font: readable size
+    int menu_font_size = MAX(8, button_font_size * 4 / 5);
+    menu_font_size = MIN(menu_font_size, 18);
 
     // Update display font
     PangoFontDescription *display_font = pango_font_description_new();
@@ -193,10 +214,10 @@ void update_ui_scaling(GtkWidget *window) {
     }
 
     // Update button sizes and fonts
-    int button_width = MAX(30, (width - 40) / 5);  // 5 columns with padding
+    int button_width = MAX(30, (width - 40) / 4);  // 4 columns with padding
     button_width = MIN(button_width, 200);  // Cap button width
-    int button_height = MAX(15, MIN(28, height / 20)); // Conservative scaling to prevent elongation
-    button_height = MIN(button_height, 28);  // Low maximum to prevent tall buttons
+    int button_height = MAX(15, height / 15); // More aggressive scaling for visible changes
+    button_height = MIN(button_height, height / 6); // Scale up to 1/6 window height
 
     // Get all widgets in the window
     GList *children = gtk_container_get_children(GTK_CONTAINER(window));
@@ -232,7 +253,8 @@ void update_ui_scaling(GtkWidget *window) {
                             GtkWidget *child = GTK_WIDGET(iter->data);
                             if (GTK_IS_BUTTON(child)) {
                                 gtk_widget_override_font(child, button_font);
-                                gtk_widget_set_size_request(child, button_width, button_height);
+                                gtk_widget_set_size_request(child, button_width, -1); // Width fixed, height flexible
+                                gtk_widget_set_vexpand(child, TRUE); // Expand vertically to fill space
                             }
                         }
                         g_list_free(grid_children);
@@ -420,44 +442,37 @@ gboolean scroll_display_to_bottom(gpointer data) {
 
 // Function to update display (shows current expression being built)
 void update_display() {
-    char display_text[1024] = "";
+    char display_text[2048] = "";
 
-    // Show the current expression + current input
+    // Build complete display: history + current expression
+    if (strlen(history_buffer) > 0) {
+        strcpy(display_text, history_buffer);
+    }
+
+    // Add current expression + current input
+    char current_expr[1024] = "";
     if (strlen(expression) > 0) {
-        strcpy(display_text, expression);
+        strcpy(current_expr, expression);
         if (strlen(current_input) > 0) {
-            if (strlen(display_text) > 0) {
-                strcat(display_text, " ");
+            if (strlen(current_expr) > 0) {
+                strcat(current_expr, " ");
             }
-            strcat(display_text, current_input);
+            strcat(current_expr, current_input);
         }
     } else if (strlen(current_input) > 0) {
-        strcpy(display_text, current_input);
+        strcpy(current_expr, current_input);
     }
 
-    // Get current buffer content
-    GtkTextIter start, end;
-    gtk_text_buffer_get_bounds(text_buffer, &start, &end);
-    char *existing_text = gtk_text_buffer_get_text(text_buffer, &start, &end, FALSE);
-
-    // If buffer has history (contains newlines), preserve it and update last line
-    if (strchr(existing_text, '\n') != NULL) {
-        // Find the last newline and replace everything after it
-        char *last_newline = strrchr(existing_text, '\n');
-        if (last_newline != NULL) {
-            GtkTextIter replace_start;
-            gtk_text_buffer_get_iter_at_offset(text_buffer, &replace_start, last_newline - existing_text + 1);
-            gtk_text_buffer_delete(text_buffer, &replace_start, &end);
-            if (strlen(display_text) > 0) {
-                gtk_text_buffer_insert(text_buffer, &end, display_text, -1);
-            }
+    if (strlen(current_expr) > 0) {
+        if (strlen(display_text) > 0) {
+            strcat(display_text, current_expr);
+        } else {
+            strcpy(display_text, current_expr);
         }
-    } else {
-        // No history yet, just set the text
-        gtk_text_buffer_set_text(text_buffer, display_text, -1);
     }
 
-    g_free(existing_text);
+    // Set the complete display text
+    gtk_text_buffer_set_text(text_buffer, display_text, -1);
 
     // Auto-scroll to show the latest content
     g_idle_add(scroll_display_to_bottom, NULL);
@@ -465,16 +480,17 @@ void update_display() {
 
 // Function to append to calculation history
 void append_to_history(const char *text) {
-    GtkTextIter end;
     char history_text[1024];
 
     snprintf(history_text, sizeof(history_text), "%s\n", text);
 
-    gtk_text_buffer_get_end_iter(text_buffer, &end);
-    gtk_text_buffer_insert(text_buffer, &end, history_text, -1);
+    // Append to history buffer
+    if (strlen(history_buffer) + strlen(history_text) < sizeof(history_buffer) - 1) {
+        strcat(history_buffer, history_text);
+    }
 
-    // Auto-scroll to show the new entry
-    g_idle_add(scroll_display_to_bottom, NULL);
+    // Update display with new history
+    update_display();
 }
 
 // Function to clear calculator (keeps calculation history)
@@ -511,8 +527,78 @@ void on_number_clicked(GtkWidget *widget, gpointer data) {
 }
 
 // Function to handle operation button clicks
+// Check if adding this operator would create consecutive operators
+int would_create_consecutive_ops(const char *expr, const char *current, char op) {
+    // If we have current input (number being entered), allow operators
+    // This allows completing the current number and starting a new operation
+    if (strlen(current) > 0) {
+        return 0;
+    }
+
+    // Allow operators at the start of expression (but not +)
+    if (strlen(expr) == 0) {
+        return op == '+';  // Block unary + at start, allow - and others
+    }
+
+    // Check the last character in the expression (ignoring spaces)
+    const char *last_char = NULL;
+    if (strlen(expr) > 0) {
+        for (int i = strlen(expr) - 1; i >= 0; i--) {
+            if (expr[i] != ' ') {
+                last_char = &expr[i];
+                break;
+            }
+        }
+    }
+
+    // If last character is an operator, don't allow another operator
+    // Exception: allow '-' after binary operators (+, *, /) for unary minus
+    // Exception: allow '(' and ')' anywhere (parentheses have special rules)
+    if (last_char && (*last_char == '+' || *last_char == '-' || *last_char == '*' || *last_char == '/')) {
+        // Parentheses are always allowed
+        if (op == '(' || op == ')') {
+            return 0;
+        }
+        // Only allow '-' after +, *, / (but not after another -)
+        if (op == '-' && *last_char != '-') {
+            return 0;  // Allow unary minus after binary operators
+        }
+        return 1;  // Block all other operator combinations
+    }
+
+    return 0;
+}
+
 void on_operation_clicked(GtkWidget *widget, gpointer data) {
     char *op = (char *)data;
+
+    // Start new expression with result if we had a previous calculation
+    if (has_result) {
+        // Special case: opening parenthesis after result should start new calculation
+        if (*op == '(') {
+            // Clear everything and start fresh with parenthesis
+            strcpy(expression, "(");
+            strcpy(current_input, "");
+            has_result = FALSE;
+            update_display();
+            return;
+        } else {
+            // Normal operators: use result as starting point
+            if (result == (int)result) {
+                sprintf(expression, "%d", (int)result);
+            } else {
+                sprintf(expression, "%.*f", result_precision, result);
+            }
+            strcpy(current_input, "");
+            has_result = FALSE;
+        }
+    }
+
+    // Prevent consecutive operators (except unary minus)
+    // Check after has_result processing so result can be used
+    if (would_create_consecutive_ops(expression, current_input, *op)) {
+        return; // Ignore this operator input
+    }
 
     // Special handling for parentheses - can be added anywhere
     if (*op == '(' || *op == ')') {
@@ -546,6 +632,9 @@ void on_operation_clicked(GtkWidget *widget, gpointer data) {
         strcat(expression, " ");
         strncat(expression, op, 1);
         // current_input stays empty, ready for next number
+    } else if (strlen(expression) == 0 && strlen(current_input) == 0) {
+        // Starting expression with operator (mainly for unary minus)
+        strncat(expression, op, 1);
     }
     update_display();
 }
@@ -575,16 +664,20 @@ void init_char_stack(CharStack *stack, int capacity) {
     stack->capacity = capacity;
 }
 
-void push_double(DoubleStack *stack, double value) {
-    if (stack->top < stack->capacity - 1) {
-        stack->data[++stack->top] = value;
+int push_double(DoubleStack *stack, double value) {
+    if (stack->top >= stack->capacity - 1) {
+        return 0; // Stack full
     }
+    stack->data[++stack->top] = value;
+    return 1; // Success
 }
 
-void push_char(CharStack *stack, char value) {
-    if (stack->top < stack->capacity - 1) {
-        stack->data[++stack->top] = value;
+int push_char(CharStack *stack, char value) {
+    if (stack->top >= stack->capacity - 1) {
+        return 0; // Stack full
     }
+    stack->data[++stack->top] = value;
+    return 1; // Success
 }
 
 double pop_double(DoubleStack *stack) {
@@ -622,7 +715,7 @@ double evaluate_expression(const char *expr) {
             continue;
         }
 
-        if (expr[i] >= '0' && expr[i] <= '9' || expr[i] == '.') {
+        if ((expr[i] >= '0' && expr[i] <= '9') || expr[i] == '.') {
             // Parse number
             double num = 0;
             int decimal_place = 0;
@@ -641,57 +734,168 @@ double evaluate_expression(const char *expr) {
                 }
                 i++;
             }
-            push_double(&values, num);
+            if (!push_double(&values, num)) {
+                free(values.data);
+                free(ops.data);
+                return NAN; // Stack overflow
+            }
             continue;
         }
 
         if (expr[i] == '(') {
-            push_char(&ops, expr[i]);
+            if (!push_char(&ops, expr[i])) {
+                free(values.data);
+                free(ops.data);
+                return NAN; // Stack overflow
+            }
         } else if (expr[i] == ')') {
-            while (peek_char(&ops) != '(') {
+            while (ops.top >= 0 && peek_char(&ops) != '(') {
                 char op = pop_char(&ops);
+                if (values.top < 1) {
+                    // Not enough operands
+                    free(values.data);
+                    free(ops.data);
+                    return NAN;
+                }
                 double b = pop_double(&values);
                 double a = pop_double(&values);
+                double result_val;
                 switch (op) {
-                    case '+': push_double(&values, a + b); break;
-                    case '-': push_double(&values, a - b); break;
-                    case '*': push_double(&values, a * b); break;
-                    case '/': push_double(&values, b != 0 ? a / b : 0); break;
+                    case '+': result_val = a + b; break;
+                    case '-': result_val = a - b; break;
+                    case '*': result_val = a * b; break;
+                    case '/': result_val = b != 0 ? a / b : 0; break;
+                    default: result_val = 0; break;
                 }
+                if (!push_double(&values, result_val)) {
+                    free(values.data);
+                    free(ops.data);
+                    return NAN; // Stack overflow
+                }
+            }
+            if (ops.top < 0 || peek_char(&ops) != '(') {
+                // Mismatched parenthesis
+                free(values.data);
+                free(ops.data);
+                return NAN;
             }
             pop_char(&ops); // Remove '('
         } else if (expr[i] == '+' || expr[i] == '-' || expr[i] == '*' || expr[i] == '/') {
-            while (ops.top >= 0 && get_precedence(peek_char(&ops)) >= get_precedence(expr[i])) {
-                char op = pop_char(&ops);
-                double b = pop_double(&values);
-                double a = pop_double(&values);
-                switch (op) {
-                    case '+': push_double(&values, a + b); break;
-                    case '-': push_double(&values, a - b); break;
-                    case '*': push_double(&values, a * b); break;
-                    case '/': push_double(&values, b != 0 ? a / b : 0); break;
+            // Check if this is a unary operator
+            int is_unary = 0;
+            if ((expr[i] == '+' || expr[i] == '-') && i > 0) {
+                // Look backwards to find the previous non-space character
+                int j = i - 1;
+                while (j >= 0 && expr[j] == ' ') {
+                    j--;
+                }
+                if (j < 0 || expr[j] == '(' || expr[j] == '+' || expr[j] == '-' ||
+                    expr[j] == '*' || expr[j] == '/') {
+                    is_unary = 1;
+                    if (expr[i] == '-') {
+                        // Unary minus: push 0 and treat as subtraction
+                        if (!push_double(&values, 0)) {
+                            free(values.data);
+                            free(ops.data);
+                            return NAN; // Stack overflow
+                        }
+                    }
+                    // For unary +, skip it entirely (no-op)
+                    if (expr[i] == '+') {
+                        i++; // Skip this character
+                        continue;
+                    }
+                }
+            } else if ((expr[i] == '+' || expr[i] == '-') && i == 0) {
+                // At start of expression
+                is_unary = 1;
+                if (expr[i] == '-') {
+                    if (!push_double(&values, 0)) {
+                        free(values.data);
+                        free(ops.data);
+                        return NAN; // Stack overflow
+                    }
+                }
+                // For unary +, skip it entirely (no-op)
+                if (expr[i] == '+') {
+                    i++; // Skip this character
+                    continue;
                 }
             }
-            push_char(&ops, expr[i]);
+
+            if (!is_unary) {
+                while (ops.top >= 0 && get_precedence(peek_char(&ops)) >= get_precedence(expr[i])) {
+                    if (values.top < 1) {
+                        // Not enough operands
+                        free(values.data);
+                        free(ops.data);
+                        return NAN;
+                    }
+                    char op = pop_char(&ops);
+                    double b = pop_double(&values);
+                    double a = pop_double(&values);
+                    double result_val;
+                    switch (op) {
+                        case '+': result_val = a + b; break;
+                        case '-': result_val = a - b; break;
+                        case '*': result_val = a * b; break;
+                        case '/': result_val = b != 0 ? a / b : 0; break;
+                        default: result_val = 0; break;
+                    }
+                    if (!push_double(&values, result_val)) {
+                        free(values.data);
+                        free(ops.data);
+                        return NAN; // Stack overflow
+                    }
+                }
+            }
+            if (!push_char(&ops, expr[i])) {
+                free(values.data);
+                free(ops.data);
+                return NAN; // Stack overflow
+            }
         }
         i++;
     }
 
     // Process remaining operations
     while (ops.top >= 0) {
+        if (values.top < 1) {
+            // Not enough operands
+            free(values.data);
+            free(ops.data);
+            return NAN;
+        }
         char op = pop_char(&ops);
         double b = pop_double(&values);
         double a = pop_double(&values);
+        double result_val;
         switch (op) {
-            case '+': push_double(&values, a + b); break;
-            case '-': push_double(&values, a - b); break;
-            case '*': push_double(&values, a * b); break;
-            case '/': push_double(&values, b != 0 ? a / b : 0); break;
+            case '+': result_val = a + b; break;
+            case '-': result_val = a - b; break;
+            case '*': result_val = a * b; break;
+            case '/': result_val = b != 0 ? a / b : 0; break;
+            default: result_val = 0; break;
+        }
+        if (!push_double(&values, result_val)) {
+            free(values.data);
+            free(ops.data);
+            return NAN; // Stack overflow
+        }
+    }
+
+    // Check for leftover opening parentheses (mismatched)
+    for (int j = 0; j <= ops.top; j++) {
+        if (ops.data[j] == '(') {
+            free(values.data);
+            free(ops.data);
+            return NAN;
         }
     }
 
     double result = values.top >= 0 ? values.data[values.top] : 0;
 
+    // Free allocated memory
     free(values.data);
     free(ops.data);
 
@@ -700,31 +904,77 @@ double evaluate_expression(const char *expr) {
 
 // Function to handle equals button click
 void on_equals_clicked(GtkWidget *widget, gpointer data) {
-    if (strlen(current_input) > 0) {
-        // Complete the expression
+    // If we have a result displayed and no new input, start fresh new calculation
+    if (has_result && strlen(current_input) == 0 && strlen(expression) == 0) {
+        has_result = FALSE;
+        strcpy(history_buffer, "");  // Clear history for fresh start
+        update_display();
+        return;
+    }
+
+    // Check if we have something to evaluate
+    if (strlen(current_input) > 0 || strlen(expression) > 0) {
+        // Complete the expression with any remaining input
+        if (strlen(current_input) > 0) {
+            if (strlen(expression) > 0) {
+                if (!safe_strcat(expression, " ", sizeof(expression))) return;
+            }
+            if (!safe_strcat(expression, current_input, sizeof(expression))) return;
+        }
+
+        // Only evaluate if we have a complete expression
         if (strlen(expression) > 0) {
-            strcat(expression, " ");
+            // Evaluate the expression
+            double calc_result = evaluate_expression(expression);
+
+            // Check for evaluation errors (NaN or other issues)
+            if (isnan(calc_result) || isinf(calc_result)) {
+                // Show syntax error for invalid expressions
+                char error_str[512];
+                sprintf(error_str, "%s = syntax error", expression);
+                has_result = FALSE;
+                strcpy(expression, "");
+                strcpy(current_input, "");
+                append_to_history(error_str);
+                return;
+            }
+
+            // Show the full expression with result
+            char result_str[512];
+            if (calc_result == (int)calc_result) {
+                sprintf(result_str, "%s = %d", expression, (int)calc_result);
+            } else {
+                // Calculate appropriate precision for display
+                int display_precision = result_precision;
+                double abs_result = fabs(calc_result);
+
+                // For numbers less than 1, use significant digit precision
+                if (abs_result < 1.0 && abs_result > 0.0) {
+                    // Find how many decimal places needed for significant digits
+                    double log_val = log10(abs_result);
+                    int first_sig_digit_pos = -floor(log_val); // Position after decimal
+                    display_precision = first_sig_digit_pos + (result_precision - 1);
+
+                    // Cap at reasonable maximum to prevent excessive output
+                    if (display_precision > 12) {
+                        display_precision = 12;
+                    }
+                }
+
+                sprintf(result_str, "%s = %.*f", expression, display_precision, calc_result);
+            }
+
+            // Store result for next calculation
+            result = calc_result;
+            has_result = TRUE;
+
+            // Clear expression and current input for next calculation (before adding to history)
+            strcpy(expression, "");
+            strcpy(current_input, "");
+
+            // Add to history
+            append_to_history(result_str);
         }
-        strcat(expression, current_input);
-
-        // Evaluate the expression
-        double calc_result = evaluate_expression(expression);
-
-        // Show the full expression with result
-        char result_str[512];
-        if (calc_result == (int)calc_result) {
-            sprintf(result_str, "%s = %d", expression, (int)calc_result);
-        } else {
-            sprintf(result_str, "%s = %.*f", expression, result_precision, calc_result);
-        }
-
-        // Add to history
-        append_to_history(result_str);
-
-        // Store result for next calculation
-        result = calc_result;
-        has_result = TRUE;
-        strcpy(current_input, "");
     }
 }
 
@@ -771,6 +1021,7 @@ void on_backspace_clicked(GtkWidget *widget, gpointer data) {
 void on_delete_clicked(GtkWidget *widget, gpointer data) {
     strcpy(current_input, "");
     strcpy(expression, "");
+    strcpy(history_buffer, "");
     has_result = FALSE;
     gtk_text_buffer_set_text(text_buffer, "", -1);
 }
@@ -884,10 +1135,13 @@ int main(int argc, char *argv[]) {
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "Basic Calculator");
     gtk_window_set_default_size(GTK_WINDOW(window), window_width, window_height);
-    
+
+    // Remove minimize and maximize functionality by setting window type
+    gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_DIALOG);
+
     // Center the window on screen
     gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER);
-    
+
     // Ensure window is resizable and not maximized
     gtk_window_set_resizable(GTK_WINDOW(window), TRUE);
 
@@ -1026,7 +1280,7 @@ int main(int argc, char *argv[]) {
 
     // Create buttons
     // Row 0: Display
-    gtk_grid_attach(GTK_GRID(grid), scrolled_window, 0, 0, 5, 1);
+    gtk_grid_attach(GTK_GRID(grid), scrolled_window, 0, 0, 4, 1);
 
     // Row 1: Clear and operations
     button = gtk_button_new_with_label("C");
@@ -1044,10 +1298,6 @@ int main(int argc, char *argv[]) {
     button = gtk_button_new_with_label("-");
     g_signal_connect(button, "clicked", G_CALLBACK(on_operation_clicked), (gpointer)"-");
     gtk_grid_attach(GTK_GRID(grid), button, 3, 1, 1, 1);
-
-    button = gtk_button_new_with_label("(");
-    g_signal_connect(button, "clicked", G_CALLBACK(on_operation_clicked), (gpointer)"(");
-    gtk_grid_attach(GTK_GRID(grid), button, 4, 1, 1, 1);
 
     // Row 2: Numbers 7, 8, 9, +
     button = gtk_button_new_with_label("7");
@@ -1068,7 +1318,7 @@ int main(int argc, char *argv[]) {
 
     button = gtk_button_new_with_label(")");
     g_signal_connect(button, "clicked", G_CALLBACK(on_operation_clicked), (gpointer)")");
-    gtk_grid_attach(GTK_GRID(grid), button, 4, 2, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), button, 3, 2, 1, 1);
 
     // Row 3: Numbers 4, 5, 6
     button = gtk_button_new_with_label("4");
@@ -1098,7 +1348,7 @@ int main(int argc, char *argv[]) {
 
     button = gtk_button_new_with_label("=");
     g_signal_connect(button, "clicked", G_CALLBACK(on_equals_clicked), NULL);
-    gtk_grid_attach(GTK_GRID(grid), button, 4, 4, 1, 2); // Span 2 rows, moved to column 4
+    gtk_grid_attach(GTK_GRID(grid), button, 3, 4, 1, 2); // Span 2 rows, back to column 3
 
     // Row 5: Numbers 0, ., (, )
     button = gtk_button_new_with_label("0");
@@ -1112,10 +1362,6 @@ int main(int argc, char *argv[]) {
     button = gtk_button_new_with_label("(");
     g_signal_connect(button, "clicked", G_CALLBACK(on_operation_clicked), (gpointer)"(");
     gtk_grid_attach(GTK_GRID(grid), button, 3, 5, 1, 1);
-
-    button = gtk_button_new_with_label(")");
-    g_signal_connect(button, "clicked", G_CALLBACK(on_operation_clicked), (gpointer)")");
-    gtk_grid_attach(GTK_GRID(grid), button, 4, 5, 1, 1);
 
     // Create vertical box to hold menu and grid
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);

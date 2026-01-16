@@ -1,9 +1,9 @@
-Basic Calculator Version 1.0.0
-===============================
+Basic Calculator Version 1.2.0
+===========================================
 
 Release Date: January 16, 2026
 
-This is the first stable release of the Basic Calculator application.
+This is version 1.2.0 with comprehensive calculator features and robust implementation.
 
 FEATURES:
 ---------
@@ -36,8 +36,29 @@ The calculator supports both mouse and keyboard input for all operations.
 
 CHANGELOG:
 ----------
-v1.0.0 - Initial release
-- Complete calculator implementation with advanced features
-- Expression parsing with parentheses and operator precedence
-- Persistent history and professional UI
-- Full keyboard and mouse support
+v1.2.0 - Advanced Calculator Release
+- Dynamic precision for small numbers with significant digit display
+- Comprehensive error handling and validation
+- Memory safety improvements and leak prevention
+- Enhanced operator input validation
+- Robust expression parsing with stack overflow protection
+- Professional UI with responsive scaling
+- Complete keyboard and mouse input support
+- Settings persistence for all preferences
+
+v1.1.0 - Enhanced Features
+- Advanced operator validation and syntax checking
+- Improved parentheses handling after operators
+- Unary operator support and negative numbers
+- Fresh calculation start functionality
+- Enhanced display buffer management
+
+v1.0.0 - Initial Release
+- Expression-based mathematical calculations
+- Full parentheses support with operator precedence
+- Persistent calculation history with scrollable display
+- Independent display and button scaling
+- Window size memory across sessions
+- Complete keyboard support for all operations
+- Professional UI with compact button design
+- Settings persistence for precision and display preferences

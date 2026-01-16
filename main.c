@@ -1316,10 +1316,6 @@ int main(int argc, char *argv[]) {
     g_signal_connect(button, "clicked", G_CALLBACK(on_operation_clicked), (gpointer)"+");
     gtk_grid_attach(GTK_GRID(grid), button, 3, 2, 1, 1);
 
-    button = gtk_button_new_with_label(")");
-    g_signal_connect(button, "clicked", G_CALLBACK(on_operation_clicked), (gpointer)")");
-    gtk_grid_attach(GTK_GRID(grid), button, 3, 2, 1, 1);
-
     // Row 3: Numbers 4, 5, 6
     button = gtk_button_new_with_label("4");
     g_signal_connect(button, "clicked", G_CALLBACK(on_number_clicked), (gpointer)"4");
@@ -1361,6 +1357,10 @@ int main(int argc, char *argv[]) {
 
     button = gtk_button_new_with_label("(");
     g_signal_connect(button, "clicked", G_CALLBACK(on_operation_clicked), (gpointer)"(");
+    gtk_grid_attach(GTK_GRID(grid), button, 2, 5, 1, 1);
+
+    button = gtk_button_new_with_label(")");
+    g_signal_connect(button, "clicked", G_CALLBACK(on_operation_clicked), (gpointer)")");
     gtk_grid_attach(GTK_GRID(grid), button, 3, 5, 1, 1);
 
     // Create vertical box to hold menu and grid
